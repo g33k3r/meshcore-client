@@ -30,7 +30,16 @@ extension ContactLocalization on Contact {
       return l10n.chat_hopsForced(pathOverride!);
     }
     if (pathLength < 0) return l10n.channelPath_floodPath;
-    if (pathLength == 0) return l10n.chat_direct;
-    return l10n.chat_hopsCount(pathLength);
+    if (pathLength == 0) return _withQuality(l10n.chat_direct);
+    return _withQuality(l10n.chat_hopsCount(pathLength));
+  }
+
+  /// Appends measured route quality (g33k3r firmware dialect, v90+) when the
+  /// device reported it. '⇄' marks an alternate route being available.
+  String _withQuality(String base) {
+    final db = pathQualityDb;
+    if (db == null) return base;
+    final q = '${db >= 0 ? '+' : ''}${db.toStringAsFixed(1)} dB';
+    return (hasAltPath == true) ? '$base · $q ⇄' : '$base · $q';
   }
 }
