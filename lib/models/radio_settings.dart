@@ -472,6 +472,26 @@ class RadioSettings {
       ),
     ),
     (
+      'USA Regulatory',
+      RadioSettings(
+        frequencyMHz: 910.25,
+        bandwidth: LoRaBandwidth.bw500,
+        spreadingFactor: LoRaSpreadingFactor.sf10,
+        codingRate: LoRaCodingRate.cr4_5,
+        txPowerDbm: 20,
+      ),
+    ),
+    (
+      'USA SoCal',
+      RadioSettings(
+        frequencyMHz: 927.875,
+        bandwidth: LoRaBandwidth.bw62_5,
+        spreadingFactor: LoRaSpreadingFactor.sf7,
+        codingRate: LoRaCodingRate.cr4_8,
+        txPowerDbm: 20,
+      ),
+    ),
+    (
       'USA/Canada',
       RadioSettings(
         frequencyMHz: 910.525,
