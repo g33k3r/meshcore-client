@@ -54,6 +54,33 @@ void main() {
       expect(contact.pathQualityDb, isNull);
     });
 
+    test('v91 extended tail carries alt path bytes', () {
+      final b = BytesBuilder();
+      b.addByte(respCodeContact);
+      b.add(Uint8List.fromList(List.generate(32, (i) => 0x10 + i)));
+      b.addByte(1); b.addByte(0); b.addByte(0x00);
+      b.add(Uint8List(64));
+      b.add(Uint8List.fromList('Alt Node'.codeUnits + List.filled(32 - 8, 0)));
+      final ts = ByteData(4)..setUint32(0, 1700000000, Endian.little);
+      b.add(ts.buffer.asUint8List());
+      b.add(Uint8List(8));
+      final lm = ByteData(4)..setUint32(0, 1700000000, Endian.little);
+      b.add(lm.buffer.asUint8List());
+      final tail = ByteData(3)..setInt16(0, 12, Endian.little);
+      tail.setUint8(2, 0x01);
+      b.add(tail.buffer.asUint8List());
+      b.addByte(0x02);            // encoded alt_len: count=2, size=1
+      b.addByte(0xCC); b.addByte(0xDD);
+      final contact = Contact.fromFrame(b.toBytes());
+      expect(contact, isNotNull);
+      expect(contact!.pathQualityDb, 3.0);
+      expect(contact.hasAltPath, isTrue);
+      expect(contact.altPath, isNotNull);
+      expect(contact.altPath!.length, 2);
+      expect(contact.altPath![0], 0xCC);
+      expect(contact.altPath![1], 0xDD);
+    });
+
     test('unmeasured sentinel maps to null dB', () {
       final frame = buildContactFrame(respCode: respCodeContact, withTail: true, snr4: -1000, altAvailable: false);
       final contact = Contact.fromFrame(frame);

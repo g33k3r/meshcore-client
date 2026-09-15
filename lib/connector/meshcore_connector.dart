@@ -1877,12 +1877,39 @@ class MeshCoreConnector extends ChangeNotifier {
     }
   }
 
+  static bool _samePath(List<int> a, List<int> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
   PathSelection? _selectAutoPathForAttempt(
     String contactPubKeyHex, {
     required int attemptIndex,
     required int maxRetries,
     List<PathSelection> recentSelections = const [],
   }) {
+    // g33k3r v91 dialect: the device-reported alternate route is the highest
+    // -confidence diversity candidate — prefer it when not just attempted.
+    final contact = _contacts.where(
+      (c) => c.publicKeyHex == contactPubKeyHex,
+    ).firstOrNull;
+    if (contact?.altPath != null && contact!.altPath!.isNotEmpty) {
+      final width = contact.pathHashWidth < 1 ? 1 : contact.pathHashWidth;
+      final altSelection = PathSelection(
+        pathBytes: contact.altPath!,
+        hopCount: contact.altPath!.length ~/ width,
+        hashWidth: width,
+        useFlood: false,
+      );
+      final recentlyUsed = recentSelections.any(
+        (s) => _samePath(s.pathBytes, altSelection.pathBytes),
+      );
+      if (!recentlyUsed) return altSelection;
+    }
+
     final hasKnownPaths =
         _pathHistoryService?.getRecentPaths(contactPubKeyHex).isNotEmpty ??
         false;

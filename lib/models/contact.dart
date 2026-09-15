@@ -29,6 +29,7 @@ class Contact {
   final Uint8List? pathOverrideBytes; // User's path override bytes
   final int? pathQualitySnr4; // g33k3r firmware dialect: bottleneck SNR*4 of device path (-1000 = unmeasured)
   final bool? hasAltPath; // g33k3r firmware dialect: alternate route available
+  final Uint8List? altPath; // g33k3r v91 dialect: device-reported alternate route bytes
 
   /// Measured bottleneck SNR in dB, or null when unknown/unmeasured.
   double? get pathQualityDb {
@@ -65,6 +66,7 @@ class Contact {
     this.rawPacket,
     this.pathQualitySnr4,
     this.hasAltPath,
+    this.altPath,
   }) : lastMessageAt = lastMessageAt ?? lastSeen;
 
   String get publicKeyHex => pubKeyToHex(publicKey);
@@ -224,6 +226,7 @@ class Contact {
       DateTime? lastModified;
       int? pathQualitySnr4;
       bool? hasAltPath;
+      Uint8List? altPathBytes;
       if (reader.remaining >= 12) {
         final latRaw = reader.readInt32LE();
         final lonRaw = reader.readInt32LE();
@@ -249,10 +252,20 @@ class Contact {
         );
       }
 
-      // g33k3r firmware private dialect (app v90+): 3-byte path-quality tail
+      // g33k3r firmware private dialect (app v90+): 3-byte path-quality tail;
+      // v91 appends [u8 encoded alt_len][alt hash bytes] when it fits.
       if (reader.remaining >= 3) {
         pathQualitySnr4 = reader.readInt16LE();
         hasAltPath = (reader.readByte() & 0x01) != 0;
+        if (reader.remaining >= 1) {
+          final altLenByte = reader.readByte();
+          final altCount = altLenByte & 0x3F;
+          final altSize = ((altLenByte >> 6) & 0x03) + 1;
+          final altBytes = altCount * altSize;
+          if (altBytes > 0 && reader.remaining >= altBytes) {
+            altPathBytes = reader.readBytes(altBytes);
+          }
+        }
       }
 
       return Contact(
@@ -274,6 +287,7 @@ class Contact {
         rawPacket: null,
         pathQualitySnr4: pathQualitySnr4,
         hasAltPath: hasAltPath,
+        altPath: altPathBytes,
       );
     } catch (e) {
       appLogger.error('Failed to parse contact frame: $e');
