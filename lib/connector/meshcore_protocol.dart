@@ -682,7 +682,11 @@ const int maxPathSize = 64;
 const int pathHashSize = 1;
 const int maxNameSize = 32;
 const int maxFrameSize = 172;
-const int appProtocolVersion = 4;
+// 4 = upstream-compatible. 90+ = g33k3r private dialect: firmware appends
+// the 3-byte path-quality tail to contact frames (see PathQualityFrame.h in
+// the firmware fork). Stock firmware treats 90 identically to 4 (only >=
+// gates exist upstream); our firmware gates the tail on >= 90.
+const int appProtocolVersion = 90;
 // Matches firmware MAX_TEXT_LEN (10 * CIPHER_BLOCK_SIZE).
 const int maxTextPayloadBytes = 160;
 const int _sendTextMsgOverheadBytes =

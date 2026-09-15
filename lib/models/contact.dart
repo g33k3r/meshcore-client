@@ -27,6 +27,15 @@ class Contact {
   final int?
   pathOverride; // User's path override: -1 = force flood, null = auto
   final Uint8List? pathOverrideBytes; // User's path override bytes
+  final int? pathQualitySnr4; // g33k3r firmware dialect: bottleneck SNR*4 of device path (-1000 = unmeasured)
+  final bool? hasAltPath; // g33k3r firmware dialect: alternate route available
+
+  /// Measured bottleneck SNR in dB, or null when unknown/unmeasured.
+  double? get pathQualityDb {
+    const unknown = -1000;
+    if (pathQualitySnr4 == null || pathQualitySnr4 == unknown) return null;
+    return pathQualitySnr4! / 4.0;
+  }
   final double? latitude;
   final double? longitude;
   final DateTime lastSeen;
@@ -54,6 +63,8 @@ class Contact {
     this.isActive = true,
     this.wasPulled = false,
     this.rawPacket,
+    this.pathQualitySnr4,
+    this.hasAltPath,
   }) : lastMessageAt = lastMessageAt ?? lastSeen;
 
   String get publicKeyHex => pubKeyToHex(publicKey);
@@ -211,6 +222,8 @@ class Contact {
 
       double? lat, lon;
       DateTime? lastModified;
+      int? pathQualitySnr4;
+      bool? hasAltPath;
       if (reader.remaining >= 12) {
         final latRaw = reader.readInt32LE();
         final lonRaw = reader.readInt32LE();
@@ -236,6 +249,12 @@ class Contact {
         );
       }
 
+      // g33k3r firmware private dialect (app v90+): 3-byte path-quality tail
+      if (reader.remaining >= 3) {
+        pathQualitySnr4 = reader.readInt16LE();
+        hasAltPath = (reader.readByte() & 0x01) != 0;
+      }
+
       return Contact(
         publicKey: pubKey,
         name: name.isEmpty ? 'Unknown' : name,
@@ -253,6 +272,8 @@ class Contact {
         lastModified: lastModified,
         isActive: true,
         rawPacket: null,
+        pathQualitySnr4: pathQualitySnr4,
+        hasAltPath: hasAltPath,
       );
     } catch (e) {
       appLogger.error('Failed to parse contact frame: $e');
