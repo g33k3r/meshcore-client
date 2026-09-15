@@ -69,3 +69,18 @@ There are some limits to acceptable use however. Generally:
 for the patch, bug fix, etc.
 * The contributor should have a good understanding of what the code does and how
 the application works in order to effectively be able to manage the agent.
+
+
+## Development Environment Setup (fresh clone)
+
+The drift database layer uses code generation — generated files are gitignored,
+so a fresh clone will fail ~29 storage/database tests until you generate them:
+
+```bash
+flutter pub get
+dart run build_runner build --delete-conflicting-outputs
+flutter test
+```
+
+First `build_runner` run takes ~80s (635 outputs). After that, all 871 tests
+should pass locally on Flutter 3.47.4 stable.
