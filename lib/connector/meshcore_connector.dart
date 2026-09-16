@@ -2960,6 +2960,13 @@ class MeshCoreConnector extends ChangeNotifier {
   void resetConnectionHandshakeStateForTest() =>
       _resetConnectionHandshakeState();
 
+  /// Drives the exact dispatch path every BLE/USB/TCP frame takes. Used by the
+  /// hostile-frame fuzz harness: the transport streams pipe bytes straight
+  /// into _handleFrameInner with no additional validation, so this is the
+  /// attack surface a malicious peer on the wire controls.
+  @visibleForTesting
+  void handleFrameForTest(List<int> data) => _handleFrameInner(data);
+
   @visibleForTesting
   Map<int, List<ChannelMessage>> get channelMessagesForTest => _channelMessages;
 
