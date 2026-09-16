@@ -1,5 +1,5 @@
 name: meshcore_open
-description: "Offband Meshcore — off-grid LoRa mesh chat and device manager for MeshCore radios."
+description: "GeekCore — off-grid LoRa mesh chat and device manager, built on MeshCore."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -131,11 +131,11 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "offband-icon.png"
+  image_path: "geekcore-icon.png"
   remove_alpha_ios: true
   windows:
     generate: true
-    image_path: "offband-icon.png"
+    image_path: "geekcore-icon.png"
     icon_size: 256
 
   # To add assets to your application, add an assets section, like this:

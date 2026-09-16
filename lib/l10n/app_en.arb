@@ -1,6 +1,6 @@
 {
   "@@locale": "en",
-  "appTitle": "Offband Meshcore",
+  "appTitle": "GeekCore",
   "nav_contacts": "Contacts",
   "nav_channels": "Channels",
   "nav_map": "Map",
@@ -49,7 +49,7 @@
   },
   "common_autoRefresh": "Autorefresh",
   "common_interval": "Interval",
-  "scanner_title": "Offband Meshcore",
+  "scanner_title": "GeekCore",
   "connectionChoiceUsbLabel": "USB",
   "connectionChoiceBluetoothLabel": "Bluetooth",
   "connectionChoiceTcpLabel": "TCP",
@@ -238,7 +238,7 @@
   "settings_appDebugLog": "App Debug Log",
   "settings_appDebugLogSubtitle": "Application debug messages",
   "settings_about": "About",
-  "settings_aboutVersion": "Offband Meshcore v{version}",
+  "settings_aboutVersion": "GeekCore v{version}",
   "@settings_aboutVersion": {
     "placeholders": {
       "version": {
@@ -246,7 +246,7 @@
       }
     }
   },
-  "settings_aboutLegalese": "© 2026 Offband. Based on MeshCore Open by zjs81, MIT licensed.",
+  "settings_aboutLegalese": "© 2026 g33k3r. Based on MeshCore Open by zjs81, MIT licensed.",
   "settings_aboutDescription": "Offband Meshcore is an open-source client for MeshCore LoRa mesh networking devices.",
   "settings_aboutLicenses": "View licenses",
   "settings_aboutWebsite": "Offband website",
