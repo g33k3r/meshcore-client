@@ -13,6 +13,7 @@ import 'screens/scanner_screen.dart';
 import 'services/storage_service.dart';
 import 'services/message_retry_service.dart';
 import 'services/path_history_service.dart';
+import 'services/signal_log_service.dart';
 import 'services/mesh_topology_service.dart';
 import 'services/app_settings_service.dart';
 import 'services/notification_service.dart';
@@ -81,6 +82,7 @@ void main() async {
   final storage = StorageService();
   final connector = MeshCoreConnector();
   final pathHistoryService = PathHistoryService(storage);
+  final signalLogService = SignalLogService();
   final meshTopologyService = MeshTopologyService();
   final retryService = MessageRetryService();
   final appSettingsService = AppSettingsService();
@@ -130,6 +132,7 @@ void main() async {
     backgroundService: backgroundService,
     timeoutPredictionService: timeoutPredictionService,
     blockService: blockService,
+    signalLogService: signalLogService,
   );
 
   await connector.loadContactCache();
@@ -146,6 +149,7 @@ void main() async {
       connector: connector,
       retryService: retryService,
       pathHistoryService: pathHistoryService,
+      signalLogService: signalLogService,
       meshTopologyService: meshTopologyService,
       storage: storage,
       appSettingsService: appSettingsService,
@@ -187,6 +191,7 @@ class MeshCoreApp extends StatelessWidget {
   final MeshCoreConnector connector;
   final MessageRetryService retryService;
   final PathHistoryService pathHistoryService;
+  final SignalLogService signalLogService;
   final MeshTopologyService meshTopologyService;
   final StorageService storage;
   final AppSettingsService appSettingsService;
@@ -205,6 +210,7 @@ class MeshCoreApp extends StatelessWidget {
     required this.connector,
     required this.retryService,
     required this.pathHistoryService,
+    required this.signalLogService,
     required this.meshTopologyService,
     required this.storage,
     required this.appSettingsService,
@@ -226,6 +232,7 @@ class MeshCoreApp extends StatelessWidget {
         ChangeNotifierProvider.value(value: connector),
         ChangeNotifierProvider.value(value: retryService),
         ChangeNotifierProvider.value(value: pathHistoryService),
+        ChangeNotifierProvider.value(value: signalLogService),
         ChangeNotifierProvider.value(value: meshTopologyService),
         ChangeNotifierProvider.value(value: appSettingsService),
         ChangeNotifierProvider.value(value: bleDebugLogService),

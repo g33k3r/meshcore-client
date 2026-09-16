@@ -34,6 +34,7 @@ import '../services/linux_ble_pairing_service_stub.dart'
     if (dart.library.io) '../services/linux_ble_pairing_service.dart';
 import '../services/message_retry_service.dart';
 import '../services/path_history_service.dart';
+import '../services/signal_log_service.dart';
 import '../services/mesh_topology_service.dart';
 import '../services/app_settings_service.dart';
 import '../services/block_service.dart';
@@ -407,6 +408,7 @@ class MeshCoreConnector extends ChangeNotifier {
   // Services
   MessageRetryService? _retryService;
   PathHistoryService? _pathHistoryService;
+  SignalLogService? _signalLogService;
   MeshTopologyService? _topologyService;
   AppSettingsService? _appSettingsService;
   BlockService? _blockService;
@@ -1425,9 +1427,11 @@ class MeshCoreConnector extends ChangeNotifier {
     BackgroundService? backgroundService,
     TimeoutPredictionService? timeoutPredictionService,
     BlockService? blockService,
+    SignalLogService? signalLogService,
   }) {
     _retryService = retryService;
     _pathHistoryService = pathHistoryService;
+    _signalLogService = signalLogService;
     _topologyService = topologyService;
     _appSettingsService = appSettingsService;
     _translationService = translationService;
@@ -1907,7 +1911,14 @@ class MeshCoreConnector extends ChangeNotifier {
       final recentlyUsed = recentSelections.any(
         (s) => _samePath(s.pathBytes, altSelection.pathBytes),
       );
-      if (!recentlyUsed) return altSelection;
+      if (!recentlyUsed) {
+        _signalLogService?.record(
+          contactPubKeyHex,
+          hopCount: altSelection.hopCount,
+          usedAltRoute: true,
+        );
+        return altSelection;
+      }
     }
 
     final hasKnownPaths =
@@ -1925,6 +1936,10 @@ class MeshCoreConnector extends ChangeNotifier {
     );
     if (selection != null) {
       _pathHistoryService?.recordPathAttempt(contactPubKeyHex, selection);
+      _signalLogService?.record(
+        contactPubKeyHex,
+        hopCount: selection.hopCount,
+      );
     }
     return selection;
   }
@@ -6035,6 +6050,16 @@ class MeshCoreConnector extends ChangeNotifier {
   void _handleContact(Uint8List frame, {bool isContact = true}) {
     final contactTmp = Contact.fromFrame(frame);
     if (contactTmp != null) {
+      // g33k3r v90 dialect: device-measured path quality tails land on every
+      // contact frame — feed the signal log trend.
+      if (contactTmp.pathQualityDb != null) {
+        _signalLogService?.record(
+          contactTmp.publicKeyHex,
+          snrDb: contactTmp.pathQualityDb,
+          hopCount:
+              contactTmp.pathLength < 0 ? null : contactTmp.pathLength,
+        );
+      }
       if (isContact && _isLoadingContacts) {
         _contactSyncReceived++;
       }
@@ -6414,6 +6439,12 @@ class MeshCoreConnector extends ChangeNotifier {
     if (message != null) {
       if (!message.isOutgoing) {
         _lastContactMsgRxTime = DateTime.now();
+        _signalLogService?.record(
+          message.senderKeyHex,
+          snrDb: message.snr,
+          rssiDbm: message.rssi,
+          hopCount: message.pathLength,
+        );
         _logMessageRx(
           kind: 'DM',
           sender: message.senderKeyHex.substring(0, 12),

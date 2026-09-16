@@ -1,3 +1,4 @@
+import 'signal_log_sheet.dart';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -501,6 +502,14 @@ class _PathManagementDialogState extends State<_PathManagementDialog> {
             ),
           ),
           actions: [
+            TextButton(
+              // GeekCore field diagnostic — hardcoded EN by design.
+              onPressed: () {
+                Navigator.pop(context);
+                SignalLogSheet.show(context, contact: widget.contact);
+              },
+              child: const Text('Signal log'),
+            ),
             TextButton(
               onPressed: () => Navigator.pop(context),
               child: Text(l10n.common_close),

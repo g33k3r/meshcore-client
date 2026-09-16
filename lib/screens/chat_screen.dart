@@ -53,6 +53,7 @@ import '../l10n/l10n.dart';
 import '../helpers/snack_bar_builder.dart';
 import '../widgets/unread_divider.dart';
 import 'telemetry_screen.dart';
+import 'package:meshcore_open/widgets/signal_log_sheet.dart';
 
 class ChatScreen extends StatefulWidget {
   final Contact contact;
@@ -1215,6 +1216,14 @@ class _ChatScreenState extends State<ChatScreen> {
           ],
         ),
         actions: [
+          TextButton(
+            // GeekCore field diagnostic — hardcoded EN by design.
+            onPressed: () {
+              Navigator.pop(context);
+              SignalLogSheet.show(context, contact: widget.contact);
+            },
+            child: const Text('Signal log'),
+          ),
           TextButton(
             onPressed: () => Navigator.push(
               context,
