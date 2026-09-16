@@ -133,7 +133,7 @@ abstract class AppLocalizations {
   /// No description provided for @appTitle.
   ///
   /// In en, this message translates to:
-  /// **'Offband Meshcore'**
+  /// **'GeekCore'**
   String get appTitle;
 
   /// No description provided for @nav_contacts.
@@ -343,7 +343,7 @@ abstract class AppLocalizations {
   /// No description provided for @scanner_title.
   ///
   /// In en, this message translates to:
-  /// **'Offband Meshcore'**
+  /// **'GeekCore'**
   String get scanner_title;
 
   /// No description provided for @connectionChoiceUsbLabel.
@@ -1189,13 +1189,13 @@ abstract class AppLocalizations {
   /// No description provided for @settings_aboutVersion.
   ///
   /// In en, this message translates to:
-  /// **'Offband Meshcore v{version}'**
+  /// **'GeekCore v{version}'**
   String settings_aboutVersion(String version);
 
   /// No description provided for @settings_aboutLegalese.
   ///
   /// In en, this message translates to:
-  /// **'© 2026 Offband. Based on MeshCore Open by zjs81, MIT licensed.'**
+  /// **'© 2026 g33k3r. Based on MeshCore Open by zjs81, MIT licensed.'**
   String get settings_aboutLegalese;
 
   /// No description provided for @settings_aboutDescription.

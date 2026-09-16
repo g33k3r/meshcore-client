@@ -9,7 +9,7 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
-  String get appTitle => 'Offband Meshcore';
+  String get appTitle => 'GeekCore';
 
   @override
   String get nav_contacts => 'Contacts';
@@ -118,7 +118,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get common_interval => 'Interval';
 
   @override
-  String get scanner_title => 'Offband Meshcore';
+  String get scanner_title => 'GeekCore';
 
   @override
   String get connectionChoiceUsbLabel => 'USB';
@@ -587,12 +587,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String settings_aboutVersion(String version) {
-    return 'Offband Meshcore v$version';
+    return 'GeekCore v$version';
   }
 
   @override
   String get settings_aboutLegalese =>
-      '© 2026 Offband. Based on MeshCore Open by zjs81, MIT licensed.';
+      '© 2026 g33k3r. Based on MeshCore Open by zjs81, MIT licensed.';
 
   @override
   String get settings_aboutDescription =>
