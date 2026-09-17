@@ -201,7 +201,7 @@ class _ChatScreenState extends State<ChatScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(contact.name),
+                Text(contact.displayName),
                 GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: hasPathData
@@ -551,8 +551,8 @@ class _ChatScreenState extends State<ChatScreen> {
               final bubble = _MessageBubble(
                 message: message,
                 senderName: resolvedContact.type == advTypeRoom
-                    ? "${contact.name} [$fourByteHex]"
-                    : contact.name,
+                    ? "${contact.displayName} [$fourByteHex]"
+                    : contact.displayName,
                 sourceId: widget.contact.publicKeyHex,
                 textScale: textScale,
                 onTap: () => _openMessagePath(message, contact),
@@ -1322,7 +1322,7 @@ class _ChatScreenState extends State<ChatScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: SelectableText(contact.name),
+        title: SelectableText(contact.displayName),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1489,7 +1489,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (message.isOutgoing) {
       senderName = connector.selfName ?? context.l10n.chat_me;
     } else if (_resolveContact(connector).type == advTypeRoom) {
-      senderName = "${contact.name} [$fourByteHex]";
+      senderName = "${contact.displayName} [$fourByteHex]";
     } else {
       senderName = _resolveContact(connector).name;
     }

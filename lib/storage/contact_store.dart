@@ -74,6 +74,7 @@ class ContactStore {
       'pathHashWidth': contact.pathHashWidth,
       'path': base64Encode(contact.path),
       'pathOverride': contact.pathOverride,
+      'customName': contact.customName,
       'pathOverrideBytes': contact.pathOverrideBytes != null
           ? base64Encode(contact.pathOverrideBytes!)
           : null,
@@ -121,6 +122,9 @@ class ContactStore {
           ? Uint8List.fromList(base64Decode(json['path'] as String))
           : Uint8List(0),
       pathOverride: json['pathOverride'] as int?,
+      customName: (json['customName'] as String?)?.trim() == ''
+          ? null
+          : json['customName'] as String?,
       pathOverrideBytes: json['pathOverrideBytes'] != null
           ? Uint8List.fromList(
               base64Decode(json['pathOverrideBytes'] as String),

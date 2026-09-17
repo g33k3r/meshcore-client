@@ -413,7 +413,7 @@ class _PathSelectionDialogState extends State<PathSelectionDialog> {
                           ),
                         ),
                         title: Text(
-                          contact.name,
+                          contact.displayName,
                           style: const TextStyle(fontSize: 14),
                         ),
                         subtitle: Text(
