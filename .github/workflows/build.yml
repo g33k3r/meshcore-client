@@ -85,7 +85,7 @@ jobs:
           KS_KEYPASS: ${{ secrets.GEEKCORE_KEY_PASS }}
         run: |
           echo "$KS_B64" | base64 -d > android/geekcore-kit.keystore
-          printf 'storeFile=geekcore-kit.keystore\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' "$KS_PASS" "$KS_ALIAS" "$KS_KEYPASS" > android/key.properties
+          printf 'storeFile=%s/android/geekcore-kit.keystore\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' "$PWD" "$KS_PASS" "$KS_ALIAS" "$KS_KEYPASS" > android/key.properties
       - run: flutter build apk --release --no-pub --dart-define-from-file=dart_defines.json
       - name: Remove keystore material
         if: always()
