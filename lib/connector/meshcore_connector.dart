@@ -3780,6 +3780,32 @@ class MeshCoreConnector extends ChangeNotifier {
 
   /// Set path override for a contact (persists across contact refreshes)
   /// pathLen: -1 = force flood, null = auto (use device path), >= 0 = specific path
+  /// Sets or clears the user's custom display name for a contact (local only).
+  /// Empty/whitespace clears it, restoring the advertised name.
+  Future<void> setContactCustomName(Contact contact, String? name) async {
+    final index = _contacts.indexWhere(
+      (c) => c.publicKeyHex == contact.publicKeyHex,
+    );
+    if (index == -1) {
+      appLogger.warn(
+        'setContactCustomName: Contact not found: ${contact.name}',
+        tag: 'Connector',
+      );
+      return;
+    }
+    final trimmed = name?.trim() ?? '';
+    _contacts[index] = _contacts[index].copyWith(
+      customName: trimmed.isEmpty ? null : trimmed,
+      clearCustomName: trimmed.isEmpty,
+    );
+    await _contactStore.saveContacts(_contacts);
+    notifyListeners();
+    appLogger.info(
+      'Custom name for ${contact.name}: ${trimmed.isEmpty ? '<cleared>' : trimmed}',
+      tag: 'Connector',
+    );
+  }
+
   Future<void> setPathOverride(
     Contact contact, {
     int? pathLen,
@@ -6108,6 +6134,7 @@ class MeshCoreConnector extends ChangeNotifier {
           lastMessageAt: mergedLastMessageAt,
           pathOverride: existing.pathOverride, // Preserve user's path choice
           pathOverrideBytes: existing.pathOverrideBytes,
+          customName: existing.customName, // Preserve user's custom name
           latitude: contact.latitude ?? existing.latitude,
           longitude: contact.longitude ?? existing.longitude,
         );

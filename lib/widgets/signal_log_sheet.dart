@@ -75,7 +75,7 @@ class _SignalLogSheetState extends State<SignalLogSheet> {
               children: [
                 Expanded(
                   child: Text(
-                    'Signal — ${contact.name.isEmpty ? 'unnamed' : contact.name}',
+                    'Signal — ${contact.displayName.isEmpty ? 'unnamed' : contact.displayName}',
                     style: Theme.of(context).textTheme.titleMedium,
                     overflow: TextOverflow.ellipsis,
                   ),

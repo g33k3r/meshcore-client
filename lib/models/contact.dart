@@ -26,6 +26,10 @@ class Contact {
   final Uint8List path; // Path bytes from device (pathLength * pathHashWidth)
   final int?
   pathOverride; // User's path override: -1 = force flood, null = auto
+
+  /// User-set custom display name (local only — never sent over the mesh).
+  /// Empty/null = show the advertised name.
+  final String? customName;
   final Uint8List? pathOverrideBytes; // User's path override bytes
   final int? pathQualitySnr4; // g33k3r firmware dialect: bottleneck SNR*4 of device path (-1000 = unmeasured)
   final bool? hasAltPath; // g33k3r firmware dialect: alternate route available
@@ -56,6 +60,7 @@ class Contact {
     required this.path,
     this.pathOverride,
     this.pathOverrideBytes,
+    this.customName,
     this.latitude,
     this.longitude,
     required this.lastSeen,
@@ -102,6 +107,13 @@ class Contact {
 
   bool get isFavorite => (flags & contactFlagFavorite) != 0;
 
+  /// The name to show in UI: the user's custom name when set, else the
+  /// device-advertised name.
+  String get displayName =>
+      (customName != null && customName!.trim().isNotEmpty)
+          ? customName!.trim()
+          : name;
+
   Contact copyWith({
     Uint8List? publicKey,
     String? name,
@@ -113,6 +125,8 @@ class Contact {
     int? pathOverride,
     Uint8List? pathOverrideBytes,
     bool clearPathOverride = false,
+    String? customName,
+    bool clearCustomName = false,
     double? latitude,
     double? longitude,
     DateTime? lastSeen,
@@ -135,6 +149,7 @@ class Contact {
       pathOverrideBytes: clearPathOverride
           ? null
           : (pathOverrideBytes ?? this.pathOverrideBytes),
+      customName: clearCustomName ? null : (customName ?? this.customName),
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
       lastSeen: lastSeen ?? this.lastSeen,

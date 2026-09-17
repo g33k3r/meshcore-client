@@ -1187,7 +1187,7 @@ class _ContactsScreenState extends State<ContactsScreen>
                                 );
                                 return CheckboxListTile(
                                   value: isSelected,
-                                  title: Text(contact.name),
+                                  title: Text(contact.displayName),
                                   subtitle: Text(
                                     contact.typeLabel(context.l10n),
                                   ),
@@ -1407,7 +1407,7 @@ class _ContactsScreenState extends State<ContactsScreen>
                           hw,
                         );
                         suggestedLabel =
-                            '${l10n.pathTrace_you} → $names → ${contact.name}';
+                            '${l10n.pathTrace_you} → $names → ${contact.displayName}';
                       }
                       final picked = await PathSelectionDialog.show(
                         context,
@@ -1522,7 +1522,7 @@ class _ContactsScreenState extends State<ContactsScreen>
                       MaterialPageRoute(
                         builder: (context) => PathTraceMapScreen(
                           title: context.l10n.contacts_pathTraceTo(
-                            contact.name,
+                            contact.displayName,
                           ),
                           path: contact.pathBytesForDisplay,
                           flipPathAround: true,
@@ -1602,7 +1602,9 @@ class _ContactsScreenState extends State<ContactsScreen>
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(context.l10n.contacts_deleteContact),
-        content: Text(context.l10n.contacts_removeConfirm(contact.name)),
+        content: Text(
+          context.l10n.contacts_removeConfirm(contact.displayName),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
@@ -1660,7 +1662,7 @@ class _ContactTile extends StatelessWidget {
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      contact.name,
+                      contact.displayName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -1680,7 +1682,7 @@ class _ContactTile extends StatelessWidget {
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      contact.name,
+                      contact.displayName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -1754,7 +1756,7 @@ class _ContactTile extends StatelessWidget {
   }
 
   Widget _buildContactAvatar(Contact contact) {
-    final emoji = firstEmoji(contact.name);
+    final emoji = firstEmoji(contact.displayName);
     if (emoji != null) {
       return Text(emoji, style: const TextStyle(fontSize: 18));
     }

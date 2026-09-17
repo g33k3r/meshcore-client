@@ -33,6 +33,22 @@ void showContactSettingsDialog(BuildContext context, Contact contact) {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Custom display name (local only — never sent over the mesh).
+              // Hardcoded EN per fork precedent (signal-log/topology-debug).
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Custom name'),
+                subtitle: Text(
+                  contact.customName == null || contact.customName!.isEmpty
+                      ? 'Advertised: ${contact.name}'
+                      : contact.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                trailing: const Icon(Icons.edit, size: 18),
+                onTap: () => _showRenameDialog(context, contact, connector),
+              ),
+              const Divider(height: 8),
               if (contact.hasLocation) ...[
                 _infoRow(
                   context.l10n.chat_location,
@@ -151,4 +167,43 @@ Widget _infoRow(String label, String value) {
       ],
     ),
   );
+}
+
+Future<void> _showRenameDialog(
+  BuildContext context,
+  Contact contact,
+  MeshCoreConnector connector,
+) async {
+  final controller = TextEditingController(
+    text: contact.customName ?? contact.name,
+  );
+  final submitted = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Custom name'),
+      content: TextField(
+        controller: controller,
+        autofocus: true,
+        maxLength: 32,
+        decoration: const InputDecoration(
+          helperText: 'Shown locally instead of the advertised name.',
+          counterStyle: TextStyle(fontSize: 10),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text('Save'),
+        ),
+      ],
+    ),
+  );
+  if (submitted == true) {
+    await connector.setContactCustomName(contact, controller.text);
+  }
+  controller.dispose();
 }
