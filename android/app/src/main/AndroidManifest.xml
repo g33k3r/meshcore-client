@@ -51,12 +51,12 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-            <!-- geekcore://chat/<pubKeyHex> — home-screen chat widget taps -->
+            <!-- geekcore:// — home-screen widget deep links (chat/channel/widget-pick hosts) -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
-                <data android:scheme="geekcore" android:host="chat"/>
+                <data android:scheme="geekcore"/>
             </intent-filter>
         </activity>
 
