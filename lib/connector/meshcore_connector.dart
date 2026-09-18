@@ -1093,6 +1093,18 @@ class MeshCoreConnector extends ChangeNotifier {
     return 'fallback:${message.senderKeyHex}:${message.isOutgoing}:${message.isCli}:${message.timestamp.millisecondsSinceEpoch}:${message.text}';
   }
 
+  /// Re-runs the persisted-history load for every known contact. Used after
+  /// a chat-history import so restored messages appear without an app
+  /// restart. Channel history reloads on channel open, so only DM
+  /// conversations need this.
+  void reloadConversations() {
+    _loadedConversationKeys.clear();
+    for (final contact in List<Contact>.from(_contacts)) {
+      _loadMessagesForContact(contact.publicKeyHex);
+    }
+    notifyListeners();
+  }
+
   /// Load older messages for a contact (pagination)
   Future<List<Message>> loadOlderMessages(
     String contactKeyHex, {

@@ -560,15 +560,34 @@ class _ChatScreenState extends State<ChatScreen> {
                 onRetryReaction: (msg, emoji) =>
                     _sendReaction(msg, contact, emoji),
               );
+              // Day divider above the oldest message of each calendar day
+              // (mirrors the channel screen). Reversed list: the older
+              // neighbour is at index+1.
+              final olderIdx = messageIndex + 1;
+              final showDayDivider =
+                  olderIdx >= reversedMessages.length ||
+                  !_isSameDay(
+                    message.timestamp,
+                    reversedMessages[olderIdx].timestamp,
+                  );
               final isUnreadAnchor =
                   _unreadDividerMessageId != null &&
                   message.messageId == _unreadDividerMessageId;
-              final child = isUnreadAnchor
+              final withUnread = isUnreadAnchor
                   ? Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [const UnreadDivider(), bubble],
                     )
                   : bubble;
+              final child = showDayDivider
+                  ? Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildDayDivider(context, message.timestamp),
+                        withUnread,
+                      ],
+                    )
+                  : withUnread;
               if (identical(message, _pendingUnreadScrollTarget)) {
                 return KeyedSubtree(key: _unreadScrollKey, child: child);
               }
@@ -1379,6 +1398,48 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  bool _isSameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  /// Date header above the oldest message of each calendar day (matches the
+  /// channel screen's divider).
+  Widget _buildDayDivider(BuildContext context, DateTime time) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final daysAgo = today
+        .difference(DateTime(time.year, time.month, time.day))
+        .inDays;
+    final locale = Localizations.localeOf(context).toString();
+    final label = daysAgo == 0
+        ? 'Today'
+        : daysAgo == 1
+        ? 'Yesterday'
+        : DateFormat.Md(locale).format(time);
+    final color = Theme.of(context).brightness == Brightness.dark
+        ? Colors.grey[400]
+        : Colors.grey[700];
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          Expanded(child: Divider(color: color?.withValues(alpha: 0.25))),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
+            ),
+          ),
+          Expanded(child: Divider(color: color?.withValues(alpha: 0.25))),
+        ],
+      ),
+    );
+  }
+
   String _formatContactLastMessage(DateTime timestamp) {
     final diff = DateTime.now().difference(timestamp);
     if (diff.isNegative || diff.inMinutes < 5) {
@@ -1904,31 +1965,33 @@ class _MessageBubble extends StatelessWidget {
                               ],
                             ],
                           ),
-                        if (enableTracing) ...[
-                          if (isOutgoing && message.retryCount > 0) ...[
-                            const SizedBox(height: 4),
-                            Padding(
-                              padding: gifUrl != null
-                                  ? const EdgeInsets.symmetric(horizontal: 8)
-                                  : EdgeInsets.zero,
-                              child: Text(
-                                context.l10n.chat_retryCount(
-                                  message.retryCount,
-                                  context
-                                      .read<AppSettingsService>()
-                                      .settings
-                                      .maxMessageRetries,
-                                ),
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: metaColor,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ],
+                        if (enableTracing && isOutgoing && message.retryCount > 0) ...[
                           const SizedBox(height: 4),
                           Padding(
+                            padding: gifUrl != null
+                                ? const EdgeInsets.symmetric(horizontal: 8)
+                                : EdgeInsets.zero,
+                            child: Text(
+                              context.l10n.chat_retryCount(
+                                message.retryCount,
+                                context
+                                    .read<AppSettingsService>()
+                                    .settings
+                                    .maxMessageRetries,
+                              ),
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: metaColor,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                        // Timestamp is ALWAYS shown (fork change: upstream only
+                        // shows it with message tracing on). Tracing keeps its
+                        // richer meta (status icon, trip time) next to it.
+                        const SizedBox(height: 4),
+                        Padding(
                             padding: gifUrl != null
                                 ? const EdgeInsets.only(
                                     left: 8,
@@ -1947,11 +2010,12 @@ class _MessageBubble extends StatelessWidget {
                                     color: metaColor,
                                   ),
                                 ),
-                                if (isOutgoing) ...[
+                                if (enableTracing && isOutgoing) ...[
                                   const SizedBox(width: 4),
                                   _buildStatusIcon(metaColor),
                                 ],
-                                if (message.tripTimeMs != null &&
+                                if (enableTracing &&
+                                    message.tripTimeMs != null &&
                                     message.status ==
                                         MessageStatus.delivered) ...[
                                   const SizedBox(width: 4),
@@ -1975,7 +2039,6 @@ class _MessageBubble extends StatelessWidget {
                               ],
                             ),
                           ),
-                        ],
                       ],
                     ),
                   ),
