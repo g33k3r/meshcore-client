@@ -1,9 +1,12 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:home_widget/home_widget.dart';
 
 import '../connector/meshcore_connector.dart';
+import '../models/channel_message.dart';
+import '../models/channel.dart';
 import '../models/contact.dart';
 import '../models/message.dart';
 import '../storage/message_store.dart';
@@ -11,23 +14,34 @@ import '../storage/prefs_manager.dart';
 import '../utils/app_logger.dart';
 import '../utils/platform_info.dart';
 
-/// Android home-screen chat widget.
+/// Android home-screen widgets: one DM widget type, one Group widget type.
+/// Each placed INSTANCE is pinned to one conversation (chosen via the
+/// in-app picker reached by tapping an unconfigured widget).
 ///
-/// Shows the latest active chat: contact display name, last message, time,
-/// unread badge. Tap opens that chat via a geekcore deep-link URI.
+/// Data flow: this service writes per-instance values via the home_widget
+/// plugin (title/id, message/id, when/id, unread/id, uri/id); the
+/// Kotlin provider renders them. Unconfigured instances show a
+/// "tap to choose" placeholder whose uri is a geekcore widget-pick link.
 ///
-/// v1 honesty: data is written while the app runs (messages only arrive while
-/// connected anyway); Android's updatePeriodMillis refreshes the view, it does
-/// not fetch new data on its own.
+/// Legacy: a globally-pinned contact (contact settings toggle) still drives
+/// any DM instance that has no explicit target.
+///
+/// v1 honesty: data is written while the app runs; updatePeriodMillis
+/// re-renders, it does not fetch.
 class ChatWidgetService {
-  // Fully qualified: the plugin resolves simple names against the
-  // applicationId (app.offband.meshcore), but the Kotlin provider lives in
-  // the build namespace (com.meshcore.meshcore_open) — simple names
-  // ClassNotFound and the update broadcast never fires.
-  static const String _androidWidgetQualified =
+  /// Fully qualified: the plugin resolves simple names against the
+  /// applicationId (app.offband.meshcore), but the Kotlin provider lives in
+  /// the build namespace (com.meshcore.meshcore_open) — simple names
+  /// ClassNotFound and the update broadcast never fires.
+  static const String _dmQualified =
       'com.meshcore.meshcore_open.ChatWidgetProvider';
+  static const String _channelQualified =
+      'com.meshcore.meshcore_open.ChannelWidgetProvider';
+
   static const String _uriScheme = 'geekcore';
-  static const String _uriHost = 'chat';
+  static const String _pinnedKeyPref = 'chat_widget_pinned_contact';
+  static const String _dmTargetsPref = 'chat_widget_dm_targets'; // {id: hex}
+  static const String _chTargetsPref = 'chat_widget_channel_targets'; // {id: idx}
 
   final MeshCoreConnector _connector;
   final MessageStore _messageStore;
@@ -37,8 +51,11 @@ class ChatWidgetService {
   StreamSubscription<Uri?>? _clickSub;
   Timer? _periodic;
 
-  /// Emits the chat key (pubKeyHex) to open when the widget is tapped.
+  /// Emits the chat key (pubKeyHex) to open when a widget is tapped, or a
+  /// pick request (type, widgetId) for unconfigured widgets.
   final ValueNotifier<String?> pendingChatKey = ValueNotifier<String?>(null);
+  final ValueNotifier<WidgetPickRequest?> pendingPick =
+      ValueNotifier<WidgetPickRequest?>(null);
 
   /// App-singleton locator (one service per app run; set in constructor).
   static ChatWidgetService? instance;
@@ -53,7 +70,45 @@ class ChatWidgetService {
     instance = this;
   }
 
-  static const String _pinnedKeyPref = 'chat_widget_pinned_contact';
+  // ── target registries ────────────────────────────────────────────
+
+  static Map<int, String> dmTargets() => _readMap(_dmTargetsPref);
+  static Map<int, int> channelTargets() => _readMap(_chTargetsPref)
+      .map((k, v) => MapEntry(k, int.tryParse(v) ?? -1));
+
+  static Future<void> setDmTarget(int widgetId, String? pubkeyHex) async =>
+      _writeMap(_dmTargetsPref, widgetId, pubkeyHex);
+
+  static Future<void> setChannelTarget(int widgetId, int? channelIndex) async =>
+      _writeMap(
+        _chTargetsPref,
+        widgetId,
+        channelIndex?.toString(),
+      );
+
+  static Map<int, String> _readMap(String pref) {
+    final raw = PrefsManager.instance.getString(pref);
+    if (raw == null || raw.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(raw) as Map<String, dynamic>;
+      return decoded.map(
+        (k, v) => MapEntry(int.tryParse(k) ?? -1, v?.toString() ?? ''),
+      )..removeWhere((k, _) => k < 0);
+    } catch (_) {
+      return {};
+    }
+  }
+
+  static Future<void> _writeMap(String pref, int widgetId, String? value) async {
+    final map = _readMap(pref);
+    if (value == null || value.isEmpty) {
+      map.remove(widgetId);
+    } else {
+      map[widgetId] = value;
+    }
+    await PrefsManager.instance.setString(pref, jsonEncode(map));
+    await instance?.update();
+  }
 
   /// The pubkey hex pinned to the home-screen widget (null = follow latest).
   static String? pinnedContactKey() =>
@@ -67,15 +122,20 @@ class ChatWidgetService {
     }
   }
 
-  /// Pure: the contact the widget should show — the pinned one when set (and
-  /// still present/active), else the latest-activity contact.
+  // ── pure data prep ───────────────────────────────────────────────
+
+  /// Pure: the DM widget's contact for [targetHex] — explicit target first,
+  /// then the legacy global pin, then latest activity. Null = placeholder.
   static Contact? pickContact(
     List<Contact> contacts, {
     String? pinnedKeyHex,
+    String? targetHex,
   }) {
-    if (pinnedKeyHex != null && pinnedKeyHex.isNotEmpty) {
-      for (final c in contacts) {
-        if (c.isActive && c.publicKeyHex == pinnedKeyHex) return c;
+    for (final source in [targetHex, pinnedKeyHex]) {
+      if (source != null && source.isNotEmpty) {
+        for (final c in contacts) {
+          if (c.isActive && c.publicKeyHex == source) return c;
+        }
       }
     }
     Contact? latest;
@@ -110,6 +170,33 @@ class ChatWidgetService {
     );
   }
 
+  /// Pure: the widget lines for a group channel + its history.
+  static ChatWidgetData formatChannel(
+    String channelName,
+    List<ChannelMessage> messages,
+    int unread,
+    int channelIndex,
+  ) {
+    String message = 'No messages yet';
+    DateTime at = DateTime.fromMillisecondsSinceEpoch(0);
+    if (messages.isNotEmpty) {
+      final m = messages.last;
+      message = m.isOutgoing
+          ? 'You: ${m.text}'
+          : '${m.senderName.isEmpty ? '?' : m.senderName}: ${m.text}';
+      at = m.timestamp;
+    }
+    return ChatWidgetData(
+      title: channelName.isEmpty ? 'Group $channelIndex' : channelName,
+      message: message,
+      time: at,
+      unread: unread,
+      chatKeyHex: 'channel:$channelIndex',
+    );
+  }
+
+  // ── lifecycle ────────────────────────────────────────────────────
+
   Future<void> start() async {
     if (!enabled) return;
     try {
@@ -127,6 +214,7 @@ class ChatWidgetService {
     _periodic?.cancel();
     _clickSub?.cancel();
     _connector.removeListener(_onConnectorChanged);
+    instance = null;
   }
 
   void _onConnectorChanged() {
@@ -137,34 +225,76 @@ class ChatWidgetService {
   Future<void> update() async {
     if (!enabled) return;
     try {
-      final contact = pickContact(
-        _connector.contacts,
-        pinnedKeyHex: pinnedContactKey(),
-      );
-      if (contact == null) return;
-      final messages = await _messageStore.loadMessages(contact.publicKeyHex);
-      final data = format(
-        contact,
-        messages,
-        _connector.getUnreadCountForContactKey(contact.publicKeyHex),
-      );
+      final writes = <Future<bool?>>[];
+
+      // DM instances
+      final dm = dmTargets();
+      final dmIds = dm.keys.toList();
+      for (final id in dmIds) {
+        final contact = pickContact(
+          _connector.contacts,
+          pinnedKeyHex: pinnedContactKey(),
+          targetHex: dm[id],
+        );
+        if (contact == null) continue;
+        final messages = await _messageStore.loadMessages(
+          contact.publicKeyHex,
+        );
+        final data = format(
+          contact,
+          messages,
+          _connector.getUnreadCountForContactKey(contact.publicKeyHex),
+        );
+        writes.addAll(_saveInstance(id, data, 'chat/${data.chatKeyHex}'));
+      }
+
+      // Group instances
+      final ch = channelTargets();
+      for (final id in ch.keys) {
+        final idx = ch[id]!;
+        Channel? channel;
+        for (final c in _connector.channels) {
+          if (c.index == idx) {
+            channel = c;
+            break;
+          }
+        }
+        final messages = await _connector.channelMessageStore
+            .loadChannelMessages(idx);
+        final data = formatChannel(
+          channel?.name ?? '',
+          messages,
+          _connector.getUnreadCountForChannelIndex(idx),
+          idx,
+        );
+        writes.addAll(_saveInstance(id, data, 'channel/$idx'));
+      }
+
+      await Future.wait(writes);
       await Future.wait([
-        HomeWidget.saveWidgetData<String>('title', data.title),
-        HomeWidget.saveWidgetData<String>('message', data.message),
-        HomeWidget.saveWidgetData<int>('when', data.time.millisecondsSinceEpoch),
-        HomeWidget.saveWidgetData<int>('unread', data.unread),
-        HomeWidget.saveWidgetData<String>(
-          'uri',
-          '$_uriScheme://$_uriHost/${data.chatKeyHex}',
-        ),
+        HomeWidget.updateWidget(qualifiedAndroidName: _dmQualified),
+        HomeWidget.updateWidget(qualifiedAndroidName: _channelQualified),
       ]);
-      await HomeWidget.updateWidget(qualifiedAndroidName: _androidWidgetQualified);
     } catch (e) {
       appLogger.warn('ChatWidget update failed: $e', tag: 'ChatWidget');
     }
   }
 
-  /// Cold-start path: the OS launched us via the widget tap.
+  List<Future<bool?>> _saveInstance(
+    int id,
+    ChatWidgetData data,
+    String uriPath,
+  ) {
+    return [
+      HomeWidget.saveWidgetData<String>('title_$id', data.title),
+      HomeWidget.saveWidgetData<String>('message_$id', data.message),
+      HomeWidget.saveWidgetData<int>('when_$id', data.time.millisecondsSinceEpoch),
+      HomeWidget.saveWidgetData<int>('unread_$id', data.unread),
+      HomeWidget.saveWidgetData<String>('uri_$id', '$_uriScheme://$uriPath'),
+    ];
+  }
+
+  /// Cold-start path: the OS launched us via a widget tap.
   Future<void> checkLaunch() async {
     if (!enabled) return;
     try {
@@ -177,11 +307,34 @@ class ChatWidgetService {
 
   void _handleUri(Uri? uri) {
     if (uri == null) return;
-    if (uri.scheme != _uriScheme || uri.host != _uriHost) return;
-    final key = uri.pathSegments.isEmpty ? '' : uri.pathSegments.first;
-    if (key.isEmpty) return;
-    pendingChatKey.value = key;
+    if (uri.scheme != _uriScheme) return;
+    if (uri.host == 'chat') {
+      final key = uri.pathSegments.isEmpty ? '' : uri.pathSegments.first;
+      if (key.isNotEmpty) pendingChatKey.value = key;
+    } else if (uri.host == 'channel') {
+      final idx = uri.pathSegments.isEmpty ? '' : uri.pathSegments.first;
+      final i = int.tryParse(idx);
+      if (i != null) {
+        pendingChatKey.value = 'channel:$i';
+      }
+    } else if (uri.host == 'widget-pick') {
+      final segs = uri.pathSegments;
+      if (segs.length >= 2) {
+        final type = segs[0];
+        final id = int.tryParse(segs[1]);
+        if (id != null && (type == 'dm' || type == 'channel')) {
+          pendingPick.value = WidgetPickRequest(type: type, widgetId: id);
+        }
+      }
+    }
   }
+}
+
+class WidgetPickRequest {
+  final String type; // 'dm' | 'channel'
+  final int widgetId;
+
+  WidgetPickRequest({required this.type, required this.widgetId});
 }
 
 class ChatWidgetData {

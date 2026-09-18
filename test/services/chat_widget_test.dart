@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:meshcore_open/models/contact.dart';
 import 'package:meshcore_open/models/message.dart';
 import 'package:meshcore_open/services/chat_widget_service.dart';
+import 'package:meshcore_open/models/channel_message.dart';
+import 'dart:typed_data';
 
 Contact _contact({
   required String name,
@@ -40,6 +42,7 @@ Message _msg(String text, DateTime at, {bool outgoing = false}) {
 }
 
 void main() {
+  _channelFormatTests();
   final t1 = DateTime(2026, 9, 17, 10);
   final t2 = DateTime(2026, 9, 17, 11);
   final t3 = DateTime(2026, 9, 17, 12);
@@ -70,6 +73,19 @@ void main() {
         pinnedKeyHex: b.publicKeyHex,
       );
       expect(pinned!.name, 'B'); // older, but explicitly pinned
+    });
+
+    test('explicit widget target beats global pin and latest', () {
+      final a = _contact(name: 'A', lastMessageAt: t3, keySeed: 1);
+      final b = _contact(name: 'B', lastMessageAt: t2, keySeed: 2);
+      final c = _contact(name: 'C', lastMessageAt: t1, keySeed: 3);
+      // pin=b globally, but the widget instance targets c
+      final r = ChatWidgetService.pickContact(
+        [a, b, c],
+        pinnedKeyHex: b.publicKeyHex,
+        targetHex: c.publicKeyHex,
+      );
+      expect(r!.name, 'C');
     });
 
     test('pinned but missing/inactive falls back to latest', () {
@@ -114,6 +130,43 @@ void main() {
       final data = ChatWidgetService.format(c, [], 0);
       expect(data.message, 'No messages yet');
       expect(data.time, t2);
+    });
+  });
+}
+
+ChannelMessage _chMsg(String sender, String text, DateTime at, {bool outgoing = false}) {
+  return ChannelMessage(
+    senderName: sender,
+    text: text,
+    timestamp: at,
+    isOutgoing: outgoing,
+  );
+}
+
+void _channelFormatTests() {
+  final t2 = DateTime(2026, 9, 17, 11);
+  group('ChatWidgetService.formatChannel', () {
+    test('incoming group message shows sender name', () {
+      final d = ChatWidgetService.formatChannel(
+        'Field Ops', [_chMsg('Gem', 'copy that', t2)], 3, 7,
+      );
+      expect(d.title, 'Field Ops');
+      expect(d.message, 'Gem: copy that');
+      expect(d.unread, 3);
+      expect(d.chatKeyHex, 'channel:7');
+    });
+
+    test('outgoing group message uses You prefix', () {
+      final d = ChatWidgetService.formatChannel(
+        'Field Ops', [_chMsg('me', 'roger', t2, outgoing: true)], 0, 7,
+      );
+      expect(d.message, 'You: roger');
+    });
+
+    test('unnamed channel falls back to Group N; empty history placeholder', () {
+      final d = ChatWidgetService.formatChannel('', [], 0, 4);
+      expect(d.title, 'Group 4');
+      expect(d.message, 'No messages yet');
     });
   });
 }

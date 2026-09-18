@@ -30,6 +30,9 @@ import 'services/observer_config_service.dart';
 import 'services/block_service.dart';
 import 'services/chat_widget_service.dart';
 import 'screens/chat_screen.dart';
+import 'screens/channel_chat_screen.dart';
+import 'models/channel.dart';
+import 'screens/widget_pick_screen.dart';
 import 'services/window_geometry_service.dart';
 import 'services/store_consolidation_service.dart';
 import 'services/storage_health_service.dart';
@@ -387,16 +390,33 @@ class _WidgetChatGateState extends State<_WidgetChatGate> {
   void initState() {
     super.initState();
     widget.chatWidgetService.pendingChatKey.addListener(_openPending);
+    widget.chatWidgetService.pendingPick.addListener(_openPick);
     // Cold start may have queued a target before we existed.
-    if (widget.chatWidgetService.pendingChatKey.value != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _openPending());
+    if (widget.chatWidgetService.pendingChatKey.value != null ||
+        widget.chatWidgetService.pendingPick.value != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _openPending();
+        _openPick();
+      });
     }
   }
 
   @override
   void dispose() {
     widget.chatWidgetService.pendingChatKey.removeListener(_openPending);
+    widget.chatWidgetService.pendingPick.removeListener(_openPick);
     super.dispose();
+  }
+
+  void _openPick() {
+    final req = widget.chatWidgetService.pendingPick.value;
+    if (req == null) return;
+    final nav = chatWidgetNavigatorKey.currentState;
+    if (nav == null) return;
+    widget.chatWidgetService.pendingPick.value = null;
+    Navigator.of(nav.context).push(
+      MaterialPageRoute(builder: (context) => WidgetPickScreen(request: req)),
+    );
   }
 
   void _openPending() {
@@ -407,6 +427,26 @@ class _WidgetChatGateState extends State<_WidgetChatGate> {
     if (nav == null || ctx == null) return;
 
     widget.chatWidgetService.pendingChatKey.value = null;
+
+    if (key.startsWith('channel:')) {
+      final idx = int.tryParse(key.substring(8));
+      if (idx == null) return;
+      Channel? channel;
+      for (final c in widget.connector.channels) {
+        if (c.index == idx) {
+          channel = c;
+          break;
+        }
+      }
+      if (channel == null) return;
+      Navigator.of(ctx).push(
+        MaterialPageRoute(
+          builder: (context) => ChannelChatScreen(channel: channel!),
+        ),
+      );
+      return;
+    }
+
     final contact = widget.connector.contacts
         .where((c) => c.publicKeyHex == key)
         .firstOrNull;

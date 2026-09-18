@@ -417,6 +417,9 @@ class MeshCoreConnector extends ChangeNotifier {
   BleDebugLogService? _bleDebugLogService;
   AppDebugLogService? _appDebugLogService;
   final ChannelMessageStore _channelMessageStore = ChannelMessageStore();
+
+  /// Read access for app-level services (home-screen widgets).
+  ChannelMessageStore get channelMessageStore => _channelMessageStore;
   final MessageStore _messageStore = MessageStore();
 
   /// Read access for app-level services (chat widget).
