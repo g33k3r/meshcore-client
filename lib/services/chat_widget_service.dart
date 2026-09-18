@@ -7,6 +7,7 @@ import '../connector/meshcore_connector.dart';
 import '../models/contact.dart';
 import '../models/message.dart';
 import '../storage/message_store.dart';
+import '../storage/prefs_manager.dart';
 import '../utils/app_logger.dart';
 import '../utils/platform_info.dart';
 
@@ -39,16 +40,44 @@ class ChatWidgetService {
   /// Emits the chat key (pubKeyHex) to open when the widget is tapped.
   final ValueNotifier<String?> pendingChatKey = ValueNotifier<String?>(null);
 
+  /// App-singleton locator (one service per app run; set in constructor).
+  static ChatWidgetService? instance;
+
   ChatWidgetService({
     required MeshCoreConnector connector,
     required MessageStore messageStore,
     bool enabled = true,
   }) : _connector = connector,
        _messageStore = messageStore,
-       enabled = enabled && PlatformInfo.isAndroid && !kIsWeb;
+       enabled = enabled && PlatformInfo.isAndroid && !kIsWeb {
+    instance = this;
+  }
 
-  /// Pure: the contact the widget should show (latest activity, active only).
-  static Contact? pickContact(List<Contact> contacts) {
+  static const String _pinnedKeyPref = 'chat_widget_pinned_contact';
+
+  /// The pubkey hex pinned to the home-screen widget (null = follow latest).
+  static String? pinnedContactKey() =>
+      PrefsManager.instance.getString(_pinnedKeyPref);
+
+  static Future<void> setPinnedContact(String? keyHex) async {
+    if (keyHex == null) {
+      await PrefsManager.instance.remove(_pinnedKeyPref);
+    } else {
+      await PrefsManager.instance.setString(_pinnedKeyPref, keyHex);
+    }
+  }
+
+  /// Pure: the contact the widget should show — the pinned one when set (and
+  /// still present/active), else the latest-activity contact.
+  static Contact? pickContact(
+    List<Contact> contacts, {
+    String? pinnedKeyHex,
+  }) {
+    if (pinnedKeyHex != null && pinnedKeyHex.isNotEmpty) {
+      for (final c in contacts) {
+        if (c.isActive && c.publicKeyHex == pinnedKeyHex) return c;
+      }
+    }
     Contact? latest;
     for (final c in contacts) {
       if (!c.isActive) continue;
@@ -108,7 +137,10 @@ class ChatWidgetService {
   Future<void> update() async {
     if (!enabled) return;
     try {
-      final contact = pickContact(_connector.contacts);
+      final contact = pickContact(
+        _connector.contacts,
+        pinnedKeyHex: pinnedContactKey(),
+      );
       if (contact == null) return;
       final messages = await _messageStore.loadMessages(contact.publicKeyHex);
       final data = format(

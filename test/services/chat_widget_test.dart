@@ -9,10 +9,11 @@ Contact _contact({
   String? customName,
   required DateTime lastMessageAt,
   bool isActive = true,
+  int keySeed = 1,
 }) {
   final key = Uint8List(32);
   for (var i = 0; i < key.length; i++) {
-    key[i] = i;
+    key[i] = (i * keySeed) & 0xFF;
   }
   return Contact(
     publicKey: key,
@@ -59,6 +60,31 @@ void main() {
 
     test('empty list yields null', () {
       expect(ChatWidgetService.pickContact([]), isNull);
+    });
+
+    test('pinned contact wins when present and active', () {
+      final a = _contact(name: 'A', lastMessageAt: t3, keySeed: 1);
+      final b = _contact(name: 'B', lastMessageAt: t1, keySeed: 2);
+      final pinned = ChatWidgetService.pickContact(
+        [a, b],
+        pinnedKeyHex: b.publicKeyHex,
+      );
+      expect(pinned!.name, 'B'); // older, but explicitly pinned
+    });
+
+    test('pinned but missing/inactive falls back to latest', () {
+      final a = _contact(name: 'A', lastMessageAt: t3, keySeed: 1);
+      final gone = _contact(
+        name: 'Gone', lastMessageAt: t2, isActive: false, keySeed: 3,
+      );
+      // pinned key matches only the inactive contact
+      final r = ChatWidgetService.pickContact(
+        [a, gone],
+        pinnedKeyHex: gone.publicKeyHex,
+      );
+      expect(r!.name, 'A');
+      // pinned key matches nothing at all
+      expect(ChatWidgetService.pickContact([a], pinnedKeyHex: 'zz'), a);
     });
   });
 

@@ -5,6 +5,7 @@ import '../connector/meshcore_connector.dart';
 import '../l10n/l10n.dart';
 import '../models/contact.dart';
 import '../services/app_settings_service.dart';
+import '../services/chat_widget_service.dart';
 
 /// The per-contact settings dialog (Cyr2Lat compression + telemetry
 /// grants). Shared so it can be opened from the chat ellipsis AND the contacts
@@ -53,6 +54,28 @@ void showContactSettingsDialog(BuildContext context, Contact contact) {
                 _infoRow(
                   context.l10n.chat_location,
                   '${contact.latitude?.toStringAsFixed(4)}, ${contact.longitude?.toStringAsFixed(4)}',
+                ),
+                const Divider(height: 8),
+              ],
+              // Show on home-screen widget (Android only).
+              if (Theme.of(context).platform == TargetPlatform.android) ...[
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Show on home-screen widget'),
+                  subtitle: const Text(
+                    'Pin this chat to the GeekCore widget (off = follow latest activity)',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  value:
+                      contact.publicKeyHex ==
+                      ChatWidgetService.pinnedContactKey(),
+                  onChanged: (v) async {
+                    await ChatWidgetService.setPinnedContact(
+                      v ? contact.publicKeyHex : null,
+                    );
+                    ChatWidgetService.instance?.update();
+                    if (context.mounted) Navigator.of(context).pop();
+                  },
                 ),
                 const Divider(height: 8),
               ],
