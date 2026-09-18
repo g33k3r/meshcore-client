@@ -28,6 +28,8 @@ import 'services/ui_view_state_service.dart';
 import 'services/timeout_prediction_service.dart';
 import 'services/observer_config_service.dart';
 import 'services/block_service.dart';
+import 'services/chat_widget_service.dart';
+import 'screens/chat_screen.dart';
 import 'services/window_geometry_service.dart';
 import 'services/store_consolidation_service.dart';
 import 'services/storage_health_service.dart';
@@ -120,6 +122,13 @@ void main() async {
   await timeoutPredictionService.initialize();
   await blockService.load();
 
+  // Home-screen chat widget (Android only; no-op elsewhere)
+  final chatWidgetService = ChatWidgetService(
+    connector: connector,
+    messageStore: connector.messageStore,
+  );
+  await chatWidgetService.start();
+
   // Wire up connector with services
   connector.initialize(
     retryService: retryService,
@@ -161,6 +170,7 @@ void main() async {
       uiViewStateService: uiViewStateService,
       timeoutPredictionService: timeoutPredictionService,
       blockService: blockService,
+      chatWidgetService: chatWidgetService,
     ),
   );
 }
@@ -203,6 +213,7 @@ class MeshCoreApp extends StatelessWidget {
   final UiViewStateService uiViewStateService;
   final TimeoutPredictionService timeoutPredictionService;
   final BlockService blockService;
+  final ChatWidgetService chatWidgetService;
 
   const MeshCoreApp({
     super.key,
@@ -222,6 +233,7 @@ class MeshCoreApp extends StatelessWidget {
     required this.uiViewStateService,
     required this.timeoutPredictionService,
     required this.blockService,
+    required this.chatWidgetService,
   });
 
   @override
@@ -297,9 +309,14 @@ class MeshCoreApp extends StatelessWidget {
                 ),
               );
             },
+            navigatorKey: chatWidgetNavigatorKey,
             home: (PlatformInfo.isWeb && !PlatformInfo.isChrome)
                 ? const ChromeRequiredScreen()
-                : const ScannerScreen(),
+                : _WidgetChatGate(
+                    connector: connector,
+                    chatWidgetService: chatWidgetService,
+                    child: const ScannerScreen(),
+                  ),
           );
         },
       ),
@@ -339,4 +356,70 @@ class MeshCoreApp extends StatelessWidget {
     if (languageCode == null) return null;
     return Locale(languageCode);
   }
+}
+
+
+/// Global navigator for home-screen widget deep links.
+final GlobalKey<NavigatorState> chatWidgetNavigatorKey =
+    GlobalKey<NavigatorState>();
+
+/// Listens for chat-widget taps and opens the chat, rendering [child] beneath.
+class _WidgetChatGate extends StatefulWidget {
+  final MeshCoreConnector connector;
+  final ChatWidgetService chatWidgetService;
+  final Widget child;
+
+  const _WidgetChatGate({
+    required this.connector,
+    required this.chatWidgetService,
+    required this.child,
+  });
+
+  @override
+  State<_WidgetChatGate> createState() => _WidgetChatGateState();
+}
+
+class _WidgetChatGateState extends State<_WidgetChatGate> {
+  @override
+  void initState() {
+    super.initState();
+    widget.chatWidgetService.pendingChatKey.addListener(_openPending);
+    // Cold start may have queued a target before we existed.
+    if (widget.chatWidgetService.pendingChatKey.value != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _openPending());
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.chatWidgetService.pendingChatKey.removeListener(_openPending);
+    super.dispose();
+  }
+
+  void _openPending() {
+    final key = widget.chatWidgetService.pendingChatKey.value;
+    if (key == null) return;
+    final nav = chatWidgetNavigatorKey.currentState;
+    final ctx = nav?.context;
+    if (nav == null || ctx == null) return;
+
+    widget.chatWidgetService.pendingChatKey.value = null;
+    final contact = widget.connector.contacts
+        .where((c) => c.publicKeyHex == key)
+        .firstOrNull;
+    if (contact == null) return;
+
+    final unread =
+        widget.connector.getUnreadCountForContactKey(contact.publicKeyHex);
+    widget.connector.markContactRead(contact.publicKeyHex);
+    Navigator.of(ctx).push(
+      MaterialPageRoute(
+        builder: (context) =>
+            ChatScreen(contact: contact, initialUnreadCount: unread),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
