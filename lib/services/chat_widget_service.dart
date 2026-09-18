@@ -19,7 +19,12 @@ import '../utils/platform_info.dart';
 /// connected anyway); Android's updatePeriodMillis refreshes the view, it does
 /// not fetch new data on its own.
 class ChatWidgetService {
-  static const String _androidWidgetName = 'ChatWidgetProvider';
+  // Fully qualified: the plugin resolves simple names against the
+  // applicationId (app.offband.meshcore), but the Kotlin provider lives in
+  // the build namespace (com.meshcore.meshcore_open) — simple names
+  // ClassNotFound and the update broadcast never fires.
+  static const String _androidWidgetQualified =
+      'com.meshcore.meshcore_open.ChatWidgetProvider';
   static const String _uriScheme = 'geekcore';
   static const String _uriHost = 'chat';
 
@@ -121,7 +126,7 @@ class ChatWidgetService {
           '$_uriScheme://$_uriHost/${data.chatKeyHex}',
         ),
       ]);
-      await HomeWidget.updateWidget(androidName: _androidWidgetName);
+      await HomeWidget.updateWidget(qualifiedAndroidName: _androidWidgetQualified);
     } catch (e) {
       appLogger.warn('ChatWidget update failed: $e', tag: 'ChatWidget');
     }
