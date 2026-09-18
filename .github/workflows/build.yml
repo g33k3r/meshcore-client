@@ -138,7 +138,9 @@ jobs:
           fi
 
           # One asset per release: drop superseded r-numbered APKs
-          for id in $(gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json assets \
+          # (REST ids via the API — gh release view --json yields GraphQL node ids,
+          #  which 404 in the REST asset-delete path)
+          for id in $(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" \
                       -q '.assets[] | select(.name != "'"$ASSET"'") | (.id|tostring)' || true); do
             gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/assets/$id"
           done
