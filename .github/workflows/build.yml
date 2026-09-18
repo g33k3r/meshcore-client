@@ -52,6 +52,8 @@ jobs:
   android-signed:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # release page updates (GITHUB_TOKEN, never a PAT)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -97,6 +99,50 @@ jobs:
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 30
+      - name: Update releases page
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="geekcore-$(date -u +%Y%m%d)"
+          RUN="r${{ github.run_number }}"
+          SHORT_SHA="${GITHUB_SHA::7}"
+          SUBJECT="$(git log -1 --pretty=%s)"
+          ASSET="geekcore-${RUN}-signed.apk"
+          TITLE="GeekCore ${RUN} — ${SUBJECT}"
+          APK="build/app/outputs/flutter-apk/app-release.apk"
+
+          {
+            echo "Signed GeekCore field-kit build (stable keystore — installs in place over previous signed builds, no uninstall)."
+            echo
+            echo "**Build:** ${RUN} · ${SHORT_SHA} · built $(date -u +%Y-%m-%d)"
+            echo "**Firmware:** app-only updates never need a Heltec reflash."
+            echo
+            echo "### Recent changes"
+            git log -8 --pretty=format:'- %h %s'
+          } > release-notes.md
+
+          # Single rolling release, date-tagged: roll to today's tag when it changes
+          if ! gh release view "$TAG" -R "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            for old in $(gh release list -R "$GITHUB_REPOSITORY" --json tagName -q '.[].tagName' \
+                         | grep -E '^geekcore-[0-9]{8}$' | grep -v "^${TAG}$" || true); do
+              gh release delete "$old" -R "$GITHUB_REPOSITORY" --yes --cleanup-tag
+            done
+            gh release create "$TAG" "$APK#$ASSET" -R "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_REF_NAME" --title "$TITLE" --notes-file release-notes.md
+          else
+            gh release edit "$TAG" -R "$GITHUB_REPOSITORY" --title "$TITLE" --notes-file release-notes.md
+            gh release upload "$TAG" "$APK#$ASSET" --clobber -R "$GITHUB_REPOSITORY"
+          fi
+
+          # One asset per release: drop superseded r-numbered APKs
+          for id in $(gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json assets \
+                      -q '.[] | select(.name != "'"$ASSET"'") | (.id|tostring)' || true); do
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/assets/$id"
+          done
+
+          gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json tagName,name,assets \
+            -q '"RELEASE " + .tagName + " | " + .name + " | " + ([.assets[].name] | join(", "))'
 
   ios:
     runs-on: macos-latest
