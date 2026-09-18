@@ -1,12 +1,15 @@
 import 'dart:async';
 
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:meshcore_open/services/chat_history_backup.dart';
 import 'package:meshcore_open/utils/gpx_export.dart';
 import 'package:meshcore_open/widgets/elements_ui.dart';
 import 'package:provider/provider.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../connector/meshcore_connector.dart';
@@ -520,7 +523,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final connector = context.watch<MeshCoreConnector>();
     return ListView(
       padding: const EdgeInsets.all(16),
-      children: [_buildActionsCard(context, connector)],
+      children: [
+        _buildActionsCard(context, connector),
+        const SizedBox(height: 16),
+        _buildChatHistoryCard(context, connector),
+      ],
     );
   }
 
@@ -1544,6 +1551,108 @@ class _SettingsScreenState extends State<SettingsScreen> {
           content: Text(l10n.settings_gpxExportError),
         );
         break;
+    }
+  }
+
+  /// Chat-history backup card. Fork addition: keeps chats survivable across
+  /// an uninstall/reinstall (the drift store only survives in-place updates).
+  /// Strings hardcoded EN per fork precedent (signal-log/topology-debug).
+  Widget _buildChatHistoryCard(
+    BuildContext context,
+    MeshCoreConnector connector,
+  ) {
+    return Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            child: Text(
+              'Chat history',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.upload_file),
+            title: const Text('Export chat history'),
+            subtitle: const Text(
+              'Save all chats and contact names to a file you keep. '
+              'Import it back after a reinstall.',
+            ),
+            onTap: () => _exportChatHistory(context),
+          ),
+          ListTile(
+            leading: const Icon(Icons.restore),
+            title: const Text('Import chat history'),
+            subtitle: const Text(
+              'Restore chats from a backup file (merged, never overwrites).',
+            ),
+            onTap: () => _importChatHistory(context, connector),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _exportChatHistory(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final file = await ChatHistoryBackup().exportToFile();
+    if (!context.mounted) return;
+    if (file == null) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('No stored chats to back up yet.')),
+      );
+      return;
+    }
+    await SharePlus.instance.share(
+      ShareParams(
+        subject: 'GeekCore chat history',
+        files: [XFile(file.path)],
+      ),
+    );
+  }
+
+  Future<void> _importChatHistory(
+    BuildContext context,
+    MeshCoreConnector connector,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final picked = await openFile(
+      acceptedTypeGroups: const [
+        XTypeGroup(label: 'JSON', extensions: ['json']),
+      ],
+    );
+    final path = picked?.path;
+    if (path == null) return;
+    try {
+      final result = await ChatHistoryBackup().importFromFile(path);
+      if (connector.isConnected) connector.reloadConversations();
+      if (!context.mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Chat history restored'),
+          content: Text(
+            '${result.messagesRestored} messages across '
+            '${result.messageKeysWritten} conversations.\n'
+            '${result.contactSettingsRestored} contact settings restored'
+            '${result.skippedKeys > 0 ? ', ${result.skippedKeys} unreadable entries skipped' : ''}.\n\n'
+            'Reopen a chat (or reconnect) if restored messages are not visible yet.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } on FormatException catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Not a GeekCore backup file: ${e.message}')),
+      );
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('Import failed: $e')));
     }
   }
 
