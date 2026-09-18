@@ -171,6 +171,7 @@ void main() async {
       timeoutPredictionService: timeoutPredictionService,
       blockService: blockService,
       chatWidgetService: chatWidgetService,
+      backgroundService: backgroundService,
     ),
   );
 }
@@ -214,6 +215,7 @@ class MeshCoreApp extends StatelessWidget {
   final TimeoutPredictionService timeoutPredictionService;
   final BlockService blockService;
   final ChatWidgetService chatWidgetService;
+  final BackgroundService backgroundService;
 
   const MeshCoreApp({
     super.key,
@@ -234,6 +236,7 @@ class MeshCoreApp extends StatelessWidget {
     required this.timeoutPredictionService,
     required this.blockService,
     required this.chatWidgetService,
+    required this.backgroundService,
   });
 
   @override
@@ -315,7 +318,7 @@ class MeshCoreApp extends StatelessWidget {
                 : _WidgetChatGate(
                     connector: connector,
                     chatWidgetService: chatWidgetService,
-                    child: const ScannerScreen(),
+                    child: ScannerScreen(backgroundService: backgroundService),
                   ),
           );
         },

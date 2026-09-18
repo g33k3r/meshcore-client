@@ -5,6 +5,7 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:provider/provider.dart';
 
 import '../connector/meshcore_connector.dart';
+import '../services/background_service.dart';
 import '../l10n/l10n.dart';
 import '../services/linux_ble_error_classifier.dart';
 import '../utils/app_logger.dart';
@@ -18,7 +19,9 @@ import 'usb_screen.dart';
 
 /// Screen for scanning and connecting to MeshCore devices
 class ScannerScreen extends StatefulWidget {
-  const ScannerScreen({super.key});
+  const ScannerScreen({super.key, this.backgroundService});
+
+  final BackgroundService? backgroundService;
 
   @override
   State<ScannerScreen> createState() => _ScannerScreenState();
@@ -73,6 +76,15 @@ class _ScannerScreenState extends State<ScannerScreen> {
     };
 
     _connector.addListener(_connectionListener);
+
+    // Zombie-service hygiene: after a swipe-kill the FGS notification outlives
+    // the engine. Stop it if we're starting up with no live connection.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        widget.backgroundService
+            ?.reconcile(connected: _connector.state != MeshCoreConnectionState.disconnected);
+      }
+    });
 
     _bluetoothStateSubscription = FlutterBluePlus.adapterState.listen(
       (state) {

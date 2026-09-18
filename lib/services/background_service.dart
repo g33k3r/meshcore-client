@@ -70,6 +70,17 @@ class BackgroundService {
     return AppLocalizations.delegate.load(match);
   }
 
+  /// Hygiene: a swipe-from-recents kills the Flutter engine (and with it BLE)
+  /// without stop() ever running, leaving a zombie "running" notification.
+  /// Reconcile from app startup: service alive but no connection => stop it.
+  Future<void> reconcile({required bool connected}) async {
+    if (!PlatformInfo.isAndroid || !_initialized) return;
+    final running = await FlutterForegroundTask.isRunningService;
+    if (running && !connected) {
+      await stop();
+    }
+  }
+
   Future<void> stop() async {
     if (!PlatformInfo.isAndroid) return;
     final running = await FlutterForegroundTask.isRunningService;
