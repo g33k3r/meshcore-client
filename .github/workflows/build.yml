@@ -111,6 +111,8 @@ jobs:
           ASSET="geekcore-${RUN}-signed.apk"
           TITLE="GeekCore ${RUN} — ${SUBJECT}"
           APK="build/app/outputs/flutter-apk/app-release.apk"
+          # upload under the r-numbered filename (download name matters, labels don't)
+          cp "$APK" "$ASSET"
 
           {
             echo "Signed GeekCore field-kit build (stable keystore — installs in place over previous signed builds, no uninstall)."
@@ -128,16 +130,16 @@ jobs:
                          | grep -E '^geekcore-[0-9]{8}$' | grep -v "^${TAG}$" || true); do
               gh release delete "$old" -R "$GITHUB_REPOSITORY" --yes --cleanup-tag
             done
-            gh release create "$TAG" "$APK#$ASSET" -R "$GITHUB_REPOSITORY" \
+            gh release create "$TAG" "$ASSET" -R "$GITHUB_REPOSITORY" \
               --target "$GITHUB_REF_NAME" --title "$TITLE" --notes-file release-notes.md
           else
             gh release edit "$TAG" -R "$GITHUB_REPOSITORY" --title "$TITLE" --notes-file release-notes.md
-            gh release upload "$TAG" "$APK#$ASSET" --clobber -R "$GITHUB_REPOSITORY"
+            gh release upload "$TAG" "$ASSET" --clobber -R "$GITHUB_REPOSITORY"
           fi
 
           # One asset per release: drop superseded r-numbered APKs
           for id in $(gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json assets \
-                      -q '.[] | select(.name != "'"$ASSET"'") | (.id|tostring)' || true); do
+                      -q '.assets[] | select(.name != "'"$ASSET"'") | (.id|tostring)' || true); do
             gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/assets/$id"
           done
 
